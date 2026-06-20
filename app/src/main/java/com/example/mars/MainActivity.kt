@@ -1,6 +1,7 @@
 package com.example.mars
 
 import android.os.Bundle
+import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -17,10 +18,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.mars.ui.theme.MARSTheme
+import java.util.Locale
 
-class MainActivity : ComponentActivity() {
+class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
+
+    private lateinit var tts: TextToSpeech
+    private var ttsReady = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        tts = TextToSpeech(this, this)
 
         enableEdgeToEdge()
 
@@ -31,26 +39,67 @@ class MainActivity : ComponentActivity() {
                 ) { innerPadding ->
 
                     MarsHomeScreen(
-                        modifier = Modifier.padding(innerPadding)
+                        modifier = Modifier.padding(innerPadding),
+                        onTalkClick = {
+                            speak("Hello Robert. How can I assist?")
+                        },
+                        onCameraClick = {
+                            speak("Camera system is not online yet.")
+                        },
+                        onAlertClick = {
+                            speak("Test alert activated. This is only a system test.")
+                        },
+                        onSettingsClick = {
+                            speak("Settings will be available in a future update.")
+                        }
                     )
                 }
             }
         }
     }
+
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts.language = Locale.UK
+            ttsReady = true
+        }
+    }
+
+    private fun speak(text: String) {
+        if (ttsReady) {
+            tts.speak(
+                text,
+                TextToSpeech.QUEUE_FLUSH,
+                null,
+                "MARS_SPEECH"
+            )
+        }
+    }
+
+    override fun onDestroy() {
+        if (::tts.isInitialized) {
+            tts.stop()
+            tts.shutdown()
+        }
+
+        super.onDestroy()
+    }
 }
 
 @Composable
 fun MarsHomeScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onTalkClick: () -> Unit,
+    onCameraClick: () -> Unit,
+    onAlertClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
-
     Column(
         modifier = modifier
             .fillMaxSize()
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-
         Text(
             text = "MARS",
             style = MaterialTheme.typography.headlineLarge
@@ -60,29 +109,37 @@ fun MarsHomeScreen(
             text = "Monitoring and Autonomous Response System"
         )
 
+        Text(
+            text = "Status: Mobile Interface Online"
+        )
+
         Button(
-            onClick = { }
+            onClick = onTalkClick
         ) {
-            Text("Talk")
+            Text("Talk to MARS")
         }
 
         Button(
-            onClick = { }
-        ) {
-            Text("Rover")
-        }
-
-        Button(
-            onClick = { }
+            onClick = onCameraClick
         ) {
             Text("Camera")
         }
 
         Button(
-            onClick = { }
+            onClick = onAlertClick
+        ) {
+            Text("Test Alert")
+        }
+
+        Button(
+            onClick = onSettingsClick
         ) {
             Text("Settings")
         }
+
+        Text(
+            text = "MARS Mobile v0.3"
+        )
     }
 }
 
@@ -90,7 +147,12 @@ fun MarsHomeScreen(
 @Composable
 fun MarsPreview() {
     MARSTheme {
-        MarsHomeScreen()
+        MarsHomeScreen(
+            onTalkClick = {},
+            onCameraClick = {},
+            onAlertClick = {},
+            onSettingsClick = {}
+        )
     }
 }
 
