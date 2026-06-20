@@ -24,6 +24,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.example.mars.ui.theme.MARSTheme
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
@@ -39,7 +41,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     ?.firstOrNull()
 
             if (!spokenText.isNullOrBlank()) {
-                speak("I heard: $spokenText")
+                handleCommand(spokenText)
             } else {
                 speak("I did not hear anything clearly.")
             }
@@ -92,6 +94,39 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             tts.language = Locale.UK
             ttsReady = true
         }
+    }
+
+    private fun handleCommand(spokenText: String) {
+        val command = spokenText.lowercase(Locale.UK)
+
+        val response = when {
+            command.contains("hello") || command.contains("hi mars") -> {
+                "Hello Robert. MARS Mobile is online."
+            }
+
+            command.contains("who are you") || command.contains("what are you") -> {
+                "I am MARS. Monitoring and Autonomous Response System."
+            }
+
+            command.contains("status") || command.contains("status report") -> {
+                "Status report. Voice system online. Mobile interface online. Rover system not connected."
+            }
+
+            command.contains("time") -> {
+                val time = SimpleDateFormat("h:mm a", Locale.UK).format(Date())
+                "The current time is $time."
+            }
+
+            command.contains("help") -> {
+                "Available commands are: hello MARS, who are you, status report, what time is it, and help."
+            }
+
+            else -> {
+                "I heard: $spokenText. I do not yet know how to respond."
+            }
+        }
+
+        speak(response)
     }
 
     private fun checkMicrophonePermissionAndListen() {
@@ -166,7 +201,7 @@ fun MarsHomeScreen(
         )
 
         Text(
-            text = "Status: Voice Recognition Online"
+            text = "Status: Command System Online"
         )
 
         Button(onClick = onTalkClick) {
@@ -186,7 +221,7 @@ fun MarsHomeScreen(
         }
 
         Text(
-            text = "MARS Mobile v0.4"
+            text = "MARS Mobile v0.5"
         )
     }
 }
@@ -203,4 +238,3 @@ fun MarsPreview() {
         )
     }
 }
-
