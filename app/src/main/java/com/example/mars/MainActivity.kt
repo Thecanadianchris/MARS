@@ -1,10 +1,15 @@
 package com.example.mars
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.speech.tts.TextToSpeech
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +22,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.mars.ui.theme.MARSTheme
 import java.util.Locale
 
@@ -24,6 +30,29 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private lateinit var tts: TextToSpeech
     private var ttsReady = false
+
+    private val speechLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val spokenText =
+                result.data
+                    ?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+                    ?.firstOrNull()
+
+            if (!spokenText.isNullOrBlank()) {
+                speak("I heard: $spokenText")
+            } else {
+                speak("I did not hear anything clearly.")
+            }
+        }
+
+    private val permissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                startListening()
+            } else {
+                speak("Microphone permission is required for voice recognition.")
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,11 +66,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 Scaffold(
                     modifier = Modifier.fillMaxSize()
                 ) { innerPadding ->
-
                     MarsHomeScreen(
                         modifier = Modifier.padding(innerPadding),
                         onTalkClick = {
-                            speak("Hello Christian. How can I assist?")
+                            speak("Listening.")
+                            checkMicrophonePermissionAndListen()
                         },
                         onCameraClick = {
                             speak("Camera system is not online yet.")
@@ -63,6 +92,33 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
             tts.language = Locale.UK
             ttsReady = true
         }
+    }
+
+    private fun checkMicrophonePermissionAndListen() {
+        val permissionGranted =
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+
+        if (permissionGranted) {
+            startListening()
+        } else {
+            permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startListening() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.UK)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to MARS")
+        }
+
+        speechLauncher.launch(intent)
     }
 
     private fun speak(text: String) {
@@ -110,35 +166,27 @@ fun MarsHomeScreen(
         )
 
         Text(
-            text = "Status: Mobile Interface Online"
+            text = "Status: Voice Recognition Online"
         )
 
-        Button(
-            onClick = onTalkClick
-        ) {
+        Button(onClick = onTalkClick) {
             Text("Talk to MARS")
         }
 
-        Button(
-            onClick = onCameraClick
-        ) {
+        Button(onClick = onCameraClick) {
             Text("Camera")
         }
 
-        Button(
-            onClick = onAlertClick
-        ) {
+        Button(onClick = onAlertClick) {
             Text("Test Alert")
         }
 
-        Button(
-            onClick = onSettingsClick
-        ) {
+        Button(onClick = onSettingsClick) {
             Text("Settings")
         }
 
         Text(
-            text = "MARS Mobile v0.3"
+            text = "MARS Mobile v0.4"
         )
     }
 }
