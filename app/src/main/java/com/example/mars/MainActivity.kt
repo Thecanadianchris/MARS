@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                     MarsHomeScreen(
                         modifier = Modifier.padding(innerPadding),
                         onTalkClick = {
-                            speak("Hello Robert. How can I assist?")
+                            speak("Hello Christian. How can I assist?")
                         },
                         onCameraClick = {
                             speak("Camera system is not online yet.")
