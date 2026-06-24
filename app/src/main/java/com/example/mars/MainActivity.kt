@@ -26,8 +26,11 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private lateinit var tts: TextToSpeech
     private var ttsReady = false
 
+    private var currentUser by mutableStateOf("Unknown")
     private var lastHeard by mutableStateOf("Awaiting command...")
     private var lastResponse by mutableStateOf("MARS standing by.")
+
+    private var selectingUser = false
 
     private val speechLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -37,7 +40,12 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
             if (!spokenText.isNullOrBlank()) {
                 lastHeard = spokenText
-                handleCommand(spokenText)
+
+                if (selectingUser) {
+                    handleUserSelection(spokenText)
+                } else {
+                    handleCommand(spokenText)
+                }
             } else {
                 respond("I did not hear anything clearly.")
             }
@@ -60,9 +68,18 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     MarsHomeScreen(
                         modifier = Modifier.padding(innerPadding),
+                        currentUser = currentUser,
                         lastHeard = lastHeard,
                         lastResponse = lastResponse,
-                        onTalkClick = { checkPermissionAndListen() },
+                        onTalkClick = {
+                            if (currentUser == "Unknown") {
+                                selectingUser = true
+                                respond("Who am I speaking to?")
+                                checkPermissionAndListen()
+                            } else {
+                                checkPermissionAndListen()
+                            }
+                        },
                         onCameraClick = { respond("Camera system is not online yet.") },
                         onAlertClick = { respond("Test alert activated. This is only a system test.") },
                         onSettingsClick = { respond("Settings will be available in a future update.") }
@@ -79,6 +96,42 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun handleUserSelection(spokenText: String) {
+        val name = spokenText.lowercase(Locale.UK)
+
+        when {
+            name.contains("christian") -> {
+                currentUser = "Christian"
+                selectingUser = false
+                respond("Hello Christian. How can I assist?")
+            }
+
+            name.contains("anne") -> {
+                currentUser = "Anne"
+                selectingUser = false
+                respond("Hello Anne. How can I assist?")
+            }
+
+            name.contains("finlay") -> {
+                currentUser = "Finlay"
+                selectingUser = false
+                respond("Hello Finlay. How can I assist?")
+            }
+
+            name.contains("guest") -> {
+                currentUser = "Guest"
+                selectingUser = false
+                respond("Hello Guest. How can I assist?")
+            }
+
+            else -> {
+                selectingUser = true
+                respond("I did not recognise that name. Please say Christian, Anne, Finlay, or Guest.")
+                checkPermissionAndListen()
+            }
+        }
+    }
+
     private fun checkPermissionAndListen() {
         val granted = ContextCompat.checkSelfPermission(
             this,
@@ -91,7 +144,10 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private fun startListening() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(
+                RecognizerIntent.EXTRA_LANGUAGE_MODEL,
+                RecognizerIntent.LANGUAGE_MODEL_FREE_FORM
+            )
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.UK)
             putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to MARS")
         }
@@ -103,8 +159,15 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         val command = commandText.lowercase(Locale.UK)
 
         val response = when {
+            command.contains("change user") ||
+                    command.contains("identify user") ||
+                    command.contains("who am i speaking to") -> {
+                selectingUser = true
+                "Who am I speaking to?"
+            }
+
             command.contains("hello") || command.contains("hi mars") ->
-                "Hello Christian. MARS Mobile is online."
+                "Hello $currentUser. MARS Mobile is online."
 
             command.contains("who are you") || command.contains("what are you") ->
                 "I am MARS. Monitoring and Autonomous Response System."
@@ -117,17 +180,21 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                 "The current time is $currentTime."
             }
 
-            command.contains("christian") ->
-                "Christian is my primary user."
+            command.contains("who am i") || command.contains("who is speaking") ->
+                "You are currently identified as $currentUser."
 
             command.contains("help") ->
-                "Say hello MARS, who are you, status report, or what time is it."
+                "Say hello MARS, who are you, status report, what time is it, who am I, or change user."
 
             else ->
                 "I heard $commandText, but I do not understand that command yet."
         }
 
         respond(response)
+
+        if (selectingUser) {
+            checkPermissionAndListen()
+        }
     }
 
     private fun respond(text: String) {
@@ -153,6 +220,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 @Composable
 fun MarsHomeScreen(
     modifier: Modifier = Modifier,
+    currentUser: String,
     lastHeard: String,
     lastResponse: String,
     onTalkClick: () -> Unit,
@@ -168,8 +236,8 @@ fun MarsHomeScreen(
     ) {
         Text("MARS", style = MaterialTheme.typography.headlineLarge)
         Text("Monitoring and Autonomous Response System")
-        Text("Primary User: Christian")
-        Text("Status: Online")
+        Text("Current User: $currentUser")
+        Text("Status: User Recognition Online")
 
         Text("Heard: $lastHeard")
         Text("Reply: $lastResponse")
@@ -190,7 +258,7 @@ fun MarsHomeScreen(
             Text("Settings")
         }
 
-        Text("MARS Mobile v0.6 Light")
+        Text("MARS Mobile v0.7")
     }
 }
 
@@ -199,8 +267,9 @@ fun MarsHomeScreen(
 fun MarsPreview() {
     MARSTheme {
         MarsHomeScreen(
-            lastHeard = "Hello MARS",
-            lastResponse = "Hello Christian. MARS Mobile is online.",
+            currentUser = "Christian",
+            lastHeard = "Who am I?",
+            lastResponse = "You are currently identified as Christian.",
             onTalkClick = {},
             onCameraClick = {},
             onAlertClick = {},
