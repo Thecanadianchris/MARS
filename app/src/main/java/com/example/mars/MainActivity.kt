@@ -32,6 +32,13 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     private var selectingUser = false
 
+    private val memories = mutableMapOf(
+        "Christian" to mutableListOf<String>(),
+        "Anne" to mutableListOf<String>(),
+        "Finlay" to mutableListOf<String>(),
+        "Guest" to mutableListOf<String>()
+    )
+
     private val speechLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             val spokenText = result.data
@@ -132,6 +139,117 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
     }
 
+    private fun handleCommand(commandText: String) {
+        val command = commandText.lowercase(Locale.UK)
+
+        val response = when {
+            command.startsWith("remember that") -> {
+                rememberFact(commandText)
+            }
+
+            command.contains("what do you know about") -> {
+                recallMemory(commandText)
+            }
+
+            command.contains("what do you remember about me") -> {
+                recallMemoryForUser(currentUser)
+            }
+
+            command.contains("change user") ||
+                    command.contains("identify user") ||
+                    command.contains("who am i speaking to") -> {
+                selectingUser = true
+                "Who am I speaking to?"
+            }
+
+            command.contains("hello") || command.contains("hi mars") ->
+                "Hello $currentUser. MARS Mobile is online."
+
+            command.contains("who are you") || command.contains("what are you") ->
+                "I am MARS. Monitoring and Autonomous Response System."
+
+            command.contains("status") ->
+                "Status report. Voice system online. Mobile interface online. Memory system online."
+
+            command.contains("time") -> {
+                val currentTime = SimpleDateFormat("h:mm a", Locale.UK).format(Date())
+                "The current time is $currentTime."
+            }
+
+            command.contains("who am i") || command.contains("who is speaking") ->
+                "You are currently identified as $currentUser."
+
+            command.contains("help") ->
+                "Say hello MARS, who are you, status report, what time is it, who am I, change user, remember that, or what do you know about."
+
+            else ->
+                "I heard $commandText, but I do not understand that command yet."
+        }
+
+        respond(response)
+
+        if (selectingUser) {
+            checkPermissionAndListen()
+        }
+    }
+
+    private fun rememberFact(commandText: String): String {
+        val fact = commandText
+            .replace("Remember that", "", ignoreCase = true)
+            .trim()
+
+        if (fact.isBlank()) {
+            return "I need something to remember."
+        }
+
+        val targetUser = when {
+            fact.lowercase(Locale.UK).startsWith("christian") -> "Christian"
+            fact.lowercase(Locale.UK).startsWith("anne") -> "Anne"
+            fact.lowercase(Locale.UK).startsWith("finlay") -> "Finlay"
+            fact.lowercase(Locale.UK).startsWith("guest") -> "Guest"
+            fact.lowercase(Locale.UK).startsWith("i ") -> currentUser
+            fact.lowercase(Locale.UK).startsWith("my ") -> currentUser
+            else -> currentUser
+        }
+
+        if (targetUser == "Unknown") {
+            return "I need to know who I am speaking to before I can remember that."
+        }
+
+        memories[targetUser]?.add(fact)
+
+        return "I will remember that $fact."
+    }
+
+    private fun recallMemory(commandText: String): String {
+        val lower = commandText.lowercase(Locale.UK)
+
+        val targetUser = when {
+            lower.contains("christian") -> "Christian"
+            lower.contains("anne") -> "Anne"
+            lower.contains("finlay") -> "Finlay"
+            lower.contains("guest") -> "Guest"
+            lower.contains("me") -> currentUser
+            else -> currentUser
+        }
+
+        return recallMemoryForUser(targetUser)
+    }
+
+    private fun recallMemoryForUser(user: String): String {
+        val userMemories = memories[user]
+
+        if (user == "Unknown") {
+            return "I do not know who I am speaking to yet."
+        }
+
+        if (userMemories.isNullOrEmpty()) {
+            return "I do not know anything about $user yet."
+        }
+
+        return userMemories.joinToString(". ")
+    }
+
     private fun checkPermissionAndListen() {
         val granted = ContextCompat.checkSelfPermission(
             this,
@@ -153,48 +271,6 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
         }
 
         speechLauncher.launch(intent)
-    }
-
-    private fun handleCommand(commandText: String) {
-        val command = commandText.lowercase(Locale.UK)
-
-        val response = when {
-            command.contains("change user") ||
-                    command.contains("identify user") ||
-                    command.contains("who am i speaking to") -> {
-                selectingUser = true
-                "Who am I speaking to?"
-            }
-
-            command.contains("hello") || command.contains("hi mars") ->
-                "Hello $currentUser. MARS Mobile is online."
-
-            command.contains("who are you") || command.contains("what are you") ->
-                "I am MARS. Monitoring and Autonomous Response System."
-
-            command.contains("status") ->
-                "Status report. Voice system online. Mobile interface online."
-
-            command.contains("time") -> {
-                val currentTime = SimpleDateFormat("h:mm a", Locale.UK).format(Date())
-                "The current time is $currentTime."
-            }
-
-            command.contains("who am i") || command.contains("who is speaking") ->
-                "You are currently identified as $currentUser."
-
-            command.contains("help") ->
-                "Say hello MARS, who are you, status report, what time is it, who am I, or change user."
-
-            else ->
-                "I heard $commandText, but I do not understand that command yet."
-        }
-
-        respond(response)
-
-        if (selectingUser) {
-            checkPermissionAndListen()
-        }
     }
 
     private fun respond(text: String) {
@@ -237,7 +313,7 @@ fun MarsHomeScreen(
         Text("MARS", style = MaterialTheme.typography.headlineLarge)
         Text("Monitoring and Autonomous Response System")
         Text("Current User: $currentUser")
-        Text("Status: User Recognition Online")
+        Text("Status: Memory System Online")
 
         Text("Heard: $lastHeard")
         Text("Reply: $lastResponse")
@@ -258,7 +334,7 @@ fun MarsHomeScreen(
             Text("Settings")
         }
 
-        Text("MARS Mobile v0.7")
+        Text("MARS Mobile v0.8")
     }
 }
 
@@ -268,8 +344,8 @@ fun MarsPreview() {
     MARSTheme {
         MarsHomeScreen(
             currentUser = "Christian",
-            lastHeard = "Who am I?",
-            lastResponse = "You are currently identified as Christian.",
+            lastHeard = "Remember that Finlay likes Star Wars",
+            lastResponse = "Finlay likes Star Wars",
             onTalkClick = {},
             onCameraClick = {},
             onAlertClick = {},
